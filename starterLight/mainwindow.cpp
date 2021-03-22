@@ -59,11 +59,13 @@ float MainWindow::angleEE(MyMesh* _mesh, int vertexID,  int faceID)
     int i = 0;
     Vec3f pointbase = _mesh->point( _mesh->vertex_handle(vertexID));
 
-    for (MyMesh::FaceVertexIter fv_it = _mesh->fv_iter(fh); fv_it.is_valid(); ++fv_it)
+    for (MyMesh::FaceVertexIter fv_it = _mesh->fv_iter(fh); i < 2; ++fv_it)
     {
-        if(_mesh->point(*fv_it) != pointbase)
+        VertexHandle vh = *fv_it;
+
+        if(_mesh->point(vh) != pointbase)
         {
-            point[i] = _mesh->point(*fv_it);
+            point[i] = _mesh->point(vh);
             i++;
         }
     }
@@ -72,8 +74,8 @@ float MainWindow::angleEE(MyMesh* _mesh, int vertexID,  int faceID)
     Vec3f v2 = point[1] - pointbase;
 
     float dot_v1_v2 = dot(v1, v2);
-    float norm_v1 = sqrnorm(v1);
-    float norm_v2 = sqrnorm(v2);
+    float norm_v1 = norm(v1);
+    float norm_v2 = norm(v2);
 
     float angle = acos(dot_v1_v2/(norm_v1 * norm_v2));
 
@@ -96,24 +98,46 @@ float MainWindow::aire(MyMesh* _mesh, int vertexId){
 
 void MainWindow::H_Curv(MyMesh* _mesh)
 {
-    /* **** à compléter ! **** */
+    float somme, longeur, angleff;
+    VertexHandle vh0, vh1;
+    FaceHandle fh0, fh1;
+    HalfedgeHandle heh;
+
+    for (MyMesh::VertexIter v_it = _mesh->vertices_begin(); v_it!=_mesh->vertices_end(); v_it++) {
+        vh0 = *v_it;
+        somme = 0;
+
+        for(MyMesh::VertexVertexCWIter vv_cwiter = _mesh->vv_cwiter(vh0); vv_cwiter.is_valid(); vv_cwiter++) {
+            vh1 = *vv_cwiter;
+            heh = _mesh->halfedge_handle(vh1);
+
+            fh0 = _mesh->face_handle(heh);
+            fh1 = _mesh->face_handle(_mesh->opposite_halfedge_handle(heh));
+
+            longeur = _mesh->calc_edge_length(heh);
+            angleff = angleFF(_mesh, fh0.idx(), fh1.idx(), vh0.idx(), vh1.idx());
+
+            somme += longeur * angleff;
+
+        }
+
+        _mesh->data(vh0).value = (1 / (4 * aire(_mesh, vh0.idx())) * somme);
+    }
 }
 
 void MainWindow::K_Curv(MyMesh* _mesh)
 {
-    float kCurv;
-    float angle;
+
+    float somme;
 
     for (MyMesh::VertexIter v_it = _mesh->vertices_begin(); v_it!=_mesh->vertices_end(); v_it++) {
-        kCurv = 0;
-        angle = 0;
         VertexHandle vh = *v_it;
-        for(MyMesh::VertexFaceIter  vf_it = _mesh->vf_iter(vh); vf_it; ++vf_it) {
+        somme = 0;
+        for(MyMesh::VertexFaceIter  vf_it = _mesh->vf_iter(vh); vf_it.is_valid(); ++vf_it) {
             FaceHandle fh = *vf_it;
-            angle += angleEE(_mesh, vh.idx(), fh.idx());
+            somme += angleEE(_mesh, vh.idx(), fh.idx());
         }
-        kCurv = (1/aire(_mesh, vh.idx())*(2*M_PI - angle));
-        _mesh->data(vh).value = kCurv;
+        _mesh->data(vh).value = (1/aire(_mesh, vh.idx())*(2*M_PI - somme));
     }
 }
 /* **** fin de la partie à compléter **** */
