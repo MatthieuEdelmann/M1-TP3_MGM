@@ -16,7 +16,7 @@ float MainWindow::faceArea(MyMesh* _mesh, int faceID)
         i++;
     }
 
-    float a = dot((point[1] - point[0]), (point[2] - point[0]))/2;
+    float a = cross((point[1] - point[0]), (point[2] - point[0])).norm()/2;
 
     return a;
 }
@@ -28,13 +28,20 @@ float MainWindow::angleFF(MyMesh* _mesh, int faceID0,  int faceID1, int vertID0,
     MyMesh::Normal n0 = _mesh->calc_face_normal(fh0);
     MyMesh::Normal n1 = _mesh->calc_face_normal(fh1);
 
-    float Norm_n0 = sqrt(pow(n0[0],2) + pow(n0[1],2) + pow(n0[2],2));
-    float Norm_n1 = sqrt(pow(n1[0],2) + pow(n1[1],2) + pow(n1[2],2));
+    //float Norm_n0 = sqrt(pow(n0[0],2) + pow(n0[1],2) + pow(n0[2],2));
+    //float Norm_n1 = sqrt(pow(n1[0],2) + pow(n1[1],2) + pow(n1[2],2));
 
-    float dot_n0_n1 = dot(n0,n1);
-
+    float dot_n0_n1 = dot(n0.normalize(),n1.normalize());
+    float angle = acos(dot_n0_n1) ;
     /*u.v = ||u|| . ||v|| . cos(alpha)*/
-    float angle = acos(dot_n0_n1/(Norm_n0*Norm_n1));
+    //printf(" dot_n0_n1 =  %f et dot = %f\n",dot_n0_n1,dot(n0,n1));
+    /*if(dot_n0_n1 < 1.0){
+
+       angle = acos(dot_n0_n1);
+    }
+    else{
+        angle = 0.0;
+    }*/
 
     VertexHandle vh0 = _mesh->vertex_handle(vertID0);
     VertexHandle vh1 = _mesh->vertex_handle(vertID1);
@@ -45,7 +52,6 @@ float MainWindow::angleFF(MyMesh* _mesh, int faceID0,  int faceID1, int vertID0,
     Vec3f vector = point1 - point0;
     Vec3f cross_n0_n1 = cross(n0,n1);
     float dot_prod = dot(vector, cross_n0_n1);
-
     if(0 < dot_prod)
         return angle;
     else
@@ -103,24 +109,21 @@ void MainWindow::H_Curv(MyMesh* _mesh)
     FaceHandle fh0, fh1;
     HalfedgeHandle heh;
 
-    for (MyMesh::VertexIter v_it = _mesh->vertices_begin(); v_it!=_mesh->vertices_end(); v_it++) {
-        vh0 = *v_it;
+    //for (MyMesh::VertexIter v_it = _mesh->vertices_begin(); v_it!=_mesh->vertices_end(); v_it++) {
+    for(VertexHandle vh : _mesh->vertices()){
+        vh0 = vh;
         somme = 0;
-
-        for(MyMesh::VertexVertexCWIter vv_cwiter = _mesh->vv_cwiter(vh0); vv_cwiter.is_valid(); vv_cwiter++) {
-            vh1 = *vv_cwiter;
-            heh = _mesh->halfedge_handle(vh1);
-
+        for(EdgeHandle eh : _mesh->ve_range(vh0)) {
+            heh = _mesh->halfedge_handle(eh,0);
+            if( _mesh->to_vertex_handle(heh) == vh0)
+                heh = heh = _mesh->halfedge_handle(eh,1);
+            vh1 = _mesh->to_vertex_handle(heh);
+            fh1 = _mesh->opposite_face_handle(heh);
             fh0 = _mesh->face_handle(heh);
-            fh1 = _mesh->face_handle(_mesh->opposite_halfedge_handle(heh));
-
-            longeur = _mesh->calc_edge_length(heh);
+            longeur = _mesh->calc_edge_length(eh);
             angleff = angleFF(_mesh, fh0.idx(), fh1.idx(), vh0.idx(), vh1.idx());
-
             somme += longeur * angleff;
-
         }
-
         _mesh->data(vh0).value = (1 / (4 * aire(_mesh, vh0.idx())) * somme);
     }
 }
@@ -137,6 +140,7 @@ void MainWindow::K_Curv(MyMesh* _mesh)
             FaceHandle fh = *vf_it;
             somme += angleEE(_mesh, vh.idx(), fh.idx());
         }
+        //printf(" value K = %f\n", (1/aire(_mesh, vh.idx())*(2*M_PI - somme)));
         _mesh->data(vh).value = (1/aire(_mesh, vh.idx())*(2*M_PI - somme));
     }
 }
